@@ -1,5 +1,5 @@
 // A mock API service to simulate saving data to a database.
-export const saveRowData = (row: string[], dataTypes: string[]): Promise<{ success: true }> => {
+export const saveRowData = (row: (string | number | null)[], dataTypes: string[]): Promise<{ success: true }> => {
   console.log('Saving row:', { data: row, types: dataTypes });
   // Simulate network latency
   return new Promise(resolve => {

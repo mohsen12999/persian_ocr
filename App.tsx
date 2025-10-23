@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ImagePreview } from './components/ImagePreview';
 import { DataTable } from './components/DataTable';
@@ -8,7 +8,8 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { SuccessMessage } from './components/SuccessMessage';
 import { extractDataFromImage } from './services/geminiService';
 import { saveRowData } from './services/apiService';
-import { ExtractedData } from './types';
+import { fetchUsers } from './services/userService';
+import { ExtractedData, User } from './types';
 
 type AppState = 'upload' | 'review' | 'complete';
 
@@ -17,11 +18,24 @@ function App() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [currentRowIndex, setCurrentRowIndex] = useState(0);
   const [dataTypeMemory, setDataTypeMemory] = useState<string[]>([]);
   const [columnSelectionMemory, setColumnSelectionMemory] = useState<boolean[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const userList = await fetchUsers();
+        setUsers(userList);
+      } catch (err) {
+        setError("Could not load user data. Please refresh the page.");
+      }
+    };
+    loadUsers();
+  }, []);
 
   const resetState = useCallback(() => {
     setAppState('upload');
@@ -68,7 +82,7 @@ function App() {
     }
   };
   
-  const handleSaveAndNext = async (dataTypes: string[], columnSelection: boolean[]) => {
+  const handleSaveAndNext = async (dataTypes: string[], columnSelection: boolean[], selectedUserId: number | null) => {
     if (!extractedData) return;
 
     setError(null);
@@ -77,9 +91,17 @@ function App() {
     // Filter data based on selection
     const filteredRow = currentRow.filter((_, index) => columnSelection[index]);
     const filteredDataTypes = dataTypes.filter((_, index) => columnSelection[index]);
+    
+    // Create the payload and substitute name for user_id
+    const payload: (string | number | null)[] = [...filteredRow];
+    const nameTypeIndex = filteredDataTypes.findIndex(type => type === 'name');
+
+    if (nameTypeIndex !== -1) {
+      payload[nameTypeIndex] = selectedUserId; // Directly use the ID passed from the form
+    }
 
     try {
-      await saveRowData(filteredRow, filteredDataTypes);
+      await saveRowData(payload, filteredDataTypes);
       setDataTypeMemory(dataTypes); // Remember selections
       setColumnSelectionMemory(columnSelection); // Remember column selection
       
@@ -150,6 +172,7 @@ function App() {
               <DataProcessingForm 
                 headers={extractedData.headers}
                 currentRow={extractedData.rows[currentRowIndex]}
+                users={users}
                 currentRowIndex={currentRowIndex}
                 totalRows={extractedData.rows.length}
                 onSave={handleSaveAndNext}

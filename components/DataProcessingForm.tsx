@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User } from '../types';
 
 interface DataProcessingFormProps {
   headers: string[];
   currentRow: string[];
+  users: User[];
   currentRowIndex: number;
   totalRows: number;
-  onSave: (dataTypes: string[], columnSelection: boolean[]) => Promise<void>;
+  onSave: (dataTypes: string[], columnSelection: boolean[], selectedUserId: number | null) => Promise<void>;
   onSkip: (dataTypes: string[], columnSelection: boolean[]) => void;
   onCancel: () => void;
   initialDataTypes: string[];
@@ -14,9 +16,38 @@ interface DataProcessingFormProps {
 
 const availableDataTypes = ['name', 'cow', 'sheep', 'goat'];
 
+// Levenshtein distance function
+const levenshteinDistance = (a: string, b: string): number => {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+};
+
+
 export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
   headers,
   currentRow,
+  users,
   currentRowIndex,
   totalRows,
   onSave,
@@ -25,19 +56,33 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
   initialDataTypes,
   initialColumnSelection,
 }) => {
-  const [dataTypes, setDataTypes] = useState<string[]>(() =>
-    initialDataTypes.length === headers.length ? initialDataTypes : Array(headers.length).fill('')
-  );
-  const [columnSelection, setColumnSelection] = useState<boolean[]>(() =>
-    initialColumnSelection.length === headers.length ? initialColumnSelection : Array(headers.length).fill(true)
-  );
+  const [dataTypes, setDataTypes] = useState<string[]>([]);
+  const [columnSelection, setColumnSelection] = useState<boolean[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // When row changes, pre-fill with remembered types and selections
+  const nameColumnIndex = useMemo(() => dataTypes.findIndex(type => type === 'name'), [dataTypes]);
+
+  // Effect to initialize or reset state when the row changes
   useEffect(() => {
-    setDataTypes(initialDataTypes.length === headers.length ? initialDataTypes : Array(headers.length).fill(''));
-    setColumnSelection(initialColumnSelection.length === headers.length ? initialColumnSelection : Array(headers.length).fill(true));
-  }, [currentRowIndex, headers.length, initialDataTypes, initialColumnSelection]);
+    const newTypes = initialDataTypes.length === headers.length ? initialDataTypes : Array(headers.length).fill('');
+    const newSelection = initialColumnSelection.length === headers.length ? initialColumnSelection : Array(headers.length).fill(true);
+    setDataTypes(newTypes);
+    setColumnSelection(newSelection);
+    
+    // Auto-select best user match for the new row
+    const currentNameIndex = newTypes.findIndex(type => type === 'name');
+    if (currentNameIndex !== -1 && users.length > 0) {
+      const extractedName = currentRow[currentNameIndex];
+      const sortedUsers = [...users].sort((a, b) => 
+        levenshteinDistance(extractedName, a.name) - levenshteinDistance(extractedName, b.name)
+      );
+      setSelectedUser(sortedUsers[0]);
+    } else {
+      setSelectedUser(null);
+    }
+  }, [currentRowIndex, headers.length, initialDataTypes, initialColumnSelection, users, currentRow]);
+
 
   const handleDataTypeChange = (index: number, value: string) => {
     const newTypes = [...dataTypes];
@@ -55,9 +100,8 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSave(dataTypes, columnSelection);
+      await onSave(dataTypes, columnSelection, selectedUser ? selectedUser.id : null);
     } catch (error) {
-      // Error is handled by the parent component, just need to stop loading state
       console.error("Submission failed for row", currentRowIndex, error);
     } finally {
       setIsSubmitting(false);
@@ -67,6 +111,41 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
   const handleSkip = () => {
     onSkip(dataTypes, columnSelection);
   };
+  
+  const renderUserSelectionUI = (colIndex: number) => {
+    if (dataTypes[colIndex] !== 'name') {
+      return null;
+    }
+    
+    const extractedName = currentRow[colIndex];
+    const sortedUsers = [...users].sort((a, b) => 
+        levenshteinDistance(extractedName, a.name) - levenshteinDistance(extractedName, b.name)
+    );
+
+    return (
+      <div className="mt-2">
+        <label className="text-xs font-semibold text-gray-400">Select Correct User (Sorted by best match)</label>
+        <ul className="mt-1 max-h-32 overflow-y-auto bg-gray-900 rounded-md border border-gray-700">
+          {sortedUsers.map(user => (
+             <li key={user.id}>
+              <button
+                type="button"
+                onClick={() => setSelectedUser(user)}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                  selectedUser?.id === user.id 
+                  ? 'bg-blue-600 text-white font-semibold' 
+                  : 'text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {user.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
 
   return (
     <div className="w-full bg-gray-800/50 p-6 rounded-xl border border-gray-700 shadow-2xl animate-fade-in mt-8">
@@ -77,6 +156,8 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {headers.map((header, colIndex) => {
             const currentSelection = dataTypes[colIndex];
+            const isNameColumn = colIndex === nameColumnIndex;
+            const displayName = isNameColumn && selectedUser ? selectedUser.name : currentRow[colIndex];
             
             return (
               <div key={colIndex} className="space-y-2 bg-gray-900/40 p-4 rounded-lg border border-gray-700">
@@ -98,8 +179,13 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
                   </div>
                 </div>
 
-                <div className="w-full bg-gray-800 border border-gray-600 rounded-md py-2 px-3 text-gray-300 min-h-[42px] flex items-center" dir="rtl">
-                  {currentRow[colIndex] || <span className="text-gray-500 italic">empty</span>}
+                <div className={`w-full bg-gray-800 border rounded-md py-2 px-3 text-gray-300 min-h-[42px] flex items-center relative transition-colors ${isNameColumn ? 'border-blue-500' : 'border-gray-600'}`} dir="rtl">
+                  {displayName || <span className="text-gray-500 italic">empty</span>}
+                  {isNameColumn && selectedUser && (
+                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs bg-blue-500 text-white font-bold px-2 py-0.5 rounded-full">
+                       ID: {selectedUser.id}
+                     </span>
+                  )}
                 </div>
                 <select
                   id={`dataType-${colIndex}`}
@@ -118,6 +204,7 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
                     );
                   })}
                 </select>
+                {renderUserSelectionUI(colIndex)}
               </div>
             );
           })}
