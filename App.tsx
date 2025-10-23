@@ -18,6 +18,8 @@ function App() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [currentRowIndex, setCurrentRowIndex] = useState(0);
+  const [dataTypeMemory, setDataTypeMemory] = useState<string[]>([]);
+  const [columnSelectionMemory, setColumnSelectionMemory] = useState<boolean[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +31,8 @@ function App() {
     setError(null);
     setIsLoading(false);
     setCurrentRowIndex(0);
+    setDataTypeMemory([]);
+    setColumnSelectionMemory([]);
   }, []);
   
   const handleFileSelect = useCallback((file: File) => {
@@ -64,14 +68,20 @@ function App() {
     }
   };
   
-  const handleSaveAndNext = async (dataTypes: string[]) => {
+  const handleSaveAndNext = async (dataTypes: string[], columnSelection: boolean[]) => {
     if (!extractedData) return;
 
     setError(null);
     const currentRow = extractedData.rows[currentRowIndex];
     
+    // Filter data based on selection
+    const filteredRow = currentRow.filter((_, index) => columnSelection[index]);
+    const filteredDataTypes = dataTypes.filter((_, index) => columnSelection[index]);
+
     try {
-      await saveRowData(currentRow, dataTypes);
+      await saveRowData(filteredRow, filteredDataTypes);
+      setDataTypeMemory(dataTypes); // Remember selections
+      setColumnSelectionMemory(columnSelection); // Remember column selection
       
       const nextIndex = currentRowIndex + 1;
       if (nextIndex < extractedData.rows.length) {
@@ -82,6 +92,19 @@ function App() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during submission.';
       setError(errorMessage);
+    }
+  };
+
+  const handleSkip = (dataTypes: string[], columnSelection: boolean[]) => {
+    if (!extractedData) return;
+    setDataTypeMemory(dataTypes); // Remember selections even when skipping
+    setColumnSelectionMemory(columnSelection); // Remember column selection when skipping
+
+    const nextIndex = currentRowIndex + 1;
+    if (nextIndex < extractedData.rows.length) {
+      setCurrentRowIndex(nextIndex);
+    } else {
+      setAppState('complete');
     }
   };
 
@@ -130,7 +153,10 @@ function App() {
                 currentRowIndex={currentRowIndex}
                 totalRows={extractedData.rows.length}
                 onSave={handleSaveAndNext}
+                onSkip={handleSkip}
                 onCancel={resetState}
+                initialDataTypes={dataTypeMemory}
+                initialColumnSelection={columnSelectionMemory}
               />
             </div>
           )}
