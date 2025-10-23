@@ -1,0 +1,5 @@
+{
+  "name": "Persian OCR Data Extractor",
+  "description": "An application to extract handwritten Persian data from an image and display it in a structured table using Gemini API.",
+  "requestFramePermissions": []
+}
