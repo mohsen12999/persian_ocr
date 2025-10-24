@@ -12,6 +12,7 @@ interface DataProcessingFormProps {
   onCancel: () => void;
   initialDataTypes: string[];
   initialColumnSelection: boolean[];
+  isSaveError: boolean;
 }
 
 const availableDataTypes = ['name', 'cow', 'sheep', 'goat'];
@@ -55,6 +56,7 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
   onCancel,
   initialDataTypes,
   initialColumnSelection,
+  isSaveError,
 }) => {
   const [dataTypes, setDataTypes] = useState<string[]>([]);
   const [columnSelection, setColumnSelection] = useState<boolean[]>([]);
@@ -102,6 +104,7 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
     try {
       await onSave(dataTypes, columnSelection, selectedUser ? selectedUser.id : null);
     } catch (error) {
+      // Error is handled by the parent, but we catch here to stop the submission spinner
       console.error("Submission failed for row", currentRowIndex, error);
     } finally {
       setIsSubmitting(false);
@@ -231,7 +234,7 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
             disabled={isSubmitting}
             className="w-full sm:w-auto flex justify-center items-center bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500/50"
           >
-            {isSubmitting ? 'Saving...' : 'Save and Process Next'}
+            {isSubmitting ? 'Saving...' : (isSaveError ? 'Retry Save' : 'Save and Process Next')}
           </button>
         </div>
       </form>

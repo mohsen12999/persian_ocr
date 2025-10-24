@@ -24,6 +24,7 @@ function App() {
   const [columnSelectionMemory, setColumnSelectionMemory] = useState<boolean[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRetryableError, setIsRetryableError] = useState<boolean>(false);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -47,6 +48,7 @@ function App() {
     setCurrentRowIndex(0);
     setDataTypeMemory([]);
     setColumnSelectionMemory([]);
+    setIsRetryableError(false);
   }, []);
   
   const handleFileSelect = useCallback((file: File) => {
@@ -64,6 +66,7 @@ function App() {
 
     setIsLoading(true);
     setError(null);
+    setIsRetryableError(false);
     setExtractedData(null);
 
     try {
@@ -86,6 +89,7 @@ function App() {
     if (!extractedData) return;
 
     setError(null);
+    setIsRetryableError(false);
     const currentRow = extractedData.rows[currentRowIndex];
     
     // Filter data based on selection
@@ -114,11 +118,14 @@ function App() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during submission.';
       setError(errorMessage);
+      setIsRetryableError(true);
     }
   };
 
   const handleSkip = (dataTypes: string[], columnSelection: boolean[]) => {
     if (!extractedData) return;
+    setError(null);
+    setIsRetryableError(false);
     setDataTypeMemory(dataTypes); // Remember selections even when skipping
     setColumnSelectionMemory(columnSelection); // Remember column selection when skipping
 
@@ -180,6 +187,7 @@ function App() {
                 onCancel={resetState}
                 initialDataTypes={dataTypeMemory}
                 initialColumnSelection={columnSelectionMemory}
+                isSaveError={isRetryableError}
               />
             </div>
           )}
