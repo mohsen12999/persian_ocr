@@ -22,6 +22,7 @@ function App() {
   const [currentRowIndex, setCurrentRowIndex] = useState(0);
   const [dataTypeMemory, setDataTypeMemory] = useState<string[]>([]);
   const [columnSelectionMemory, setColumnSelectionMemory] = useState<boolean[]>([]);
+  const [processingDate, setProcessingDate] = useState<string>('14040404');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isRetryableError, setIsRetryableError] = useState<boolean>(false);
@@ -105,7 +106,7 @@ function App() {
     }
 
     try {
-      await saveRowData(payload, filteredDataTypes);
+      await saveRowData(payload, filteredDataTypes, processingDate);
       setDataTypeMemory(dataTypes); // Remember selections
       setColumnSelectionMemory(columnSelection); // Remember column selection
       
@@ -187,6 +188,8 @@ function App() {
                 onCancel={resetState}
                 initialDataTypes={dataTypeMemory}
                 initialColumnSelection={columnSelectionMemory}
+                processingDate={processingDate}
+                onProcessingDateChange={setProcessingDate}
                 isSaveError={isRetryableError}
               />
             </div>

@@ -12,6 +12,8 @@ interface DataProcessingFormProps {
   onCancel: () => void;
   initialDataTypes: string[];
   initialColumnSelection: boolean[];
+  processingDate: string;
+  onProcessingDateChange: (date: string) => void;
   isSaveError: boolean;
 }
 
@@ -56,6 +58,8 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
   onCancel,
   initialDataTypes,
   initialColumnSelection,
+  processingDate,
+  onProcessingDateChange,
   isSaveError,
 }) => {
   const [dataTypes, setDataTypes] = useState<string[]>([]);
@@ -156,6 +160,19 @@ export const DataProcessingForm: React.FC<DataProcessingFormProps> = ({
         Process Row {currentRowIndex + 1} of {totalRows}
       </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="border-b border-gray-700 pb-4">
+            <label htmlFor="processing-date" className="block text-sm font-medium text-gray-400 mb-1">
+                Processing Date
+            </label>
+            <input
+                type="text"
+                id="processing-date"
+                value={processingDate}
+                onChange={(e) => onProcessingDateChange(e.target.value)}
+                className="w-full sm:w-1/2 md:w-1/3 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {headers.map((header, colIndex) => {
             const currentSelection = dataTypes[colIndex];
